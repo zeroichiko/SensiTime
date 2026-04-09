@@ -28,6 +28,7 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
     private Sensor proximitySensor;
     private AudioManager audioManager;
     private PowerManager powerManager;
+    private PowerManager.WakeLock wakeLock; // Corrected: Use PowerManager.WakeLock
     private boolean isTtsReady = false;
     private long lastTriggerTime = 0;
 
@@ -37,6 +38,10 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
         tts = new TextToSpeech(this, this);
         audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+
+        if (powerManager != null) {
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SensiTime::KeepAwake");
+        }
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
@@ -68,7 +73,7 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
 
         Notification notification = new Notification.Builder(this, channelId)
                 .setContentTitle("SensiTime")
-                .setContentText("Monitoring proximity while charging...")
+                .setContentText("Monitoring proximity and triggers...")
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .build();
 
@@ -101,21 +106,43 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() != Sensor.TYPE_PROXIMITY) return;
 
+        // Condition: Screen MUST be off to avoid accidental noise during active use
         if (powerManager != null && !powerManager.isInteractive()) {
-            if (isCharging()) {
-                float distance = event.values[0];
-                SharedPreferences prefs = getSharedPreferences("sensitime_prefs", MODE_PRIVATE);
-                int threshold = prefs.getInt("dist", 5);
+            SharedPreferences prefs = getHPreferences(); // Note: I will fix this helper method below or just call directly
+            
+            // Corrected logic for Power Saving: Check Charging condition FIRST
+            boolean chargingOnly = prefs.getBoolean("charging_only", true);
+            if (chargingOnly && !isCharging()) {
+                return; // Exit immediately to avoid any WakeLock acquisition and save battery
+            }
 
+            if (prefs.getBoolean("prox_trigger", true)) {
+                float distance = event.values[0];
+                int threshold = prefs.getInt("dist", 5);
                 if (distance < threshold) {
-                    long now = System.currentTimeMillis();
-                    int debounceSec = prefs.getInt("debounce", 5);
-                    if (now - lastTriggerTime > (debounceSec * 1000L)) { 
-                        speakTime();
-                        lastTriggerTime = now;
+                    // Only acquire la l- la WakeLock if we have passed the charging check
+                    if (wakeLock != null && !wakeLock.isHeld()) {
+                        wakeLock.acquire(10 * 1000L); // Hold for max 10s to finish TTS playback
                     }
+                    executeSpeakSequence();
                 }
             }
+        }
+    }
+
+    // Helper method used in onSensorChanged (fixing the call)
+    private SharedPreferences getHPreferences() {
+        return getSharedPreferences("sensitime_prefs", MODE_PRIVATE);
+    }
+
+    private void executeSpeakSequence() {
+        SharedPreferences prefs = getSharedPreferences("sensitime_prefs", MODE_PRIVATE);
+        long now = System.currentTimeMillis();
+        int debounceSec = prefs.getInt("debounce", 5);
+
+        if (now - lastTriggerTime > (debounceSec * 1000L)) {
+            speakTime();
+            lastTriggerTime = now;
         }
     }
 
@@ -143,6 +170,9 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
 
     @Override
     public void onDestroy() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
         if (sensorManager != null) sensorManager.unregisterListener(this);
         if (tts != null) {
             tts.stop();

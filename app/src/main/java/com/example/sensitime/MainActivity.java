@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -13,6 +14,7 @@ import android.graphics.Color;
 
 public class MainActivity extends Activity {
     private EditText etDistance, etVolume, etRate, etDebounce;
+    private CheckBox cbChargingOnly, cbProxTrigger;
     private Button btnStart, btnStop, btnTest;
     private TextView statusText;
 
@@ -20,28 +22,46 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setGravity(Gravity.CENTER);
-        layout.setPadding(50, 50, 50, 50);
-        layout.setBackgroundColor(Color.BLACK);
+        // 1. Create Root Layout (Dark Theme: Black background)
+        LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        rootLayout.setGravity(Gravity.CENTER);
+        rootLayout.setPadding(50, 50, 50, 50);
+        rootLayout.setBackgroundColor(Color.BLACK);
 
         SharedPreferences prefs = getSharedPreferences("sensitime_prefs", MODE_PRIVATE);
 
-        etDistance = createLabeledInput(layout, "Proximity Threshold (cm):", prefs.getInt("dist", 5));
-        etVolume = createLabeledInput(layout, "Voice Volume (0-15):", prefs.getInt("vol", 7));
-        etRate = createDecimalInput(layout, "Speech Rate (0.5 - 2.0):", String.valueOf(prefs.getFloat("rate", 1.0f)));
-        etDebounce = createLabeledInput(layout, "Debounce Interval (sec):", prefs.getInt("debounce", 5));
+        // --- Section: Parameter Settings ---
+        addSectionTitle(rootLayout, "Parameter Settings");
+        etDistance = createLabeledInput(rootLayout, "Proximity Threshold (cm):", prefs.getInt("dist", 5));
+        etVolume = createLabeledInput(rootLayout, "Voice Volume (0-15):", prefs.getInt("vol", 7));
+        // Speech rate supports decimals
+        etRate = createDecimalInput(rootLayout, "Speech Rate (0.5 - 2.0):", String.valueOf(prefs.getFloat("rate", 1.0f)));
+        etDebounce = createLabeledInput(rootLayout, "Debounce Interval (sec):", prefs.getInt("debounce", 5));
+
+        // --- Section: Trigger Options ---
+        addSectionTitle(rootLayout, "Trigger Options");
+        cbChargingOnly = createToggle(rootLayout, "Require Charging to Trigger", prefs.getBoolean("charging_only", true));
+        cbProxTrigger = createToggle(rootLayout, "Enable Proximity Trigger", prefs.getBoolean("prox_trigger", true));
+
+        // --- Section: Controls ---
+        addSectionTitle(rootLayout, "Controls");
 
         btnStart = new Button(this);
         btnStart.setText("Start Service");
         btnStart.setTextColor(Color.WHITE);
         btnStart.setOnClickListener(v -> {
             savePrefs();
-            startService(new Intent(this, TimeService.class));
+            Intent intent = new Intent(this, TimeService.class);
+            // Use startForegroundService for Android 8.0+ to prevent crashes
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
             statusText.setText("Status: Running in background");
         });
-        layout.addView(btnStart);
+        rootLayout.addView(btnStart);
 
         btnStop = new Button(this);
         btnStop.setText("Stop Service");
@@ -50,7 +70,7 @@ public class MainActivity extends Activity {
             stopService(new Intent(this, TimeService.class));
             statusText.setText("Status: Stopped");
         });
-        layout.addView(btnStop);
+        rootLayout.addView(btnStop);
 
         btnTest = new Button(this);
         btnTest.setText("Test Current Settings");
@@ -61,14 +81,25 @@ public class MainActivity extends Activity {
             intent.setAction("ACTION_TEST_VOICE");
             startService(intent);
         });
-        layout.addView(btnTest);
+        rootLayout.addView(btnTest);
 
         statusText = new TextView(this);
         statusText.setText("Status: Idle");
         statusText.setTextColor(Color.WHITE);
-        layout.addView(statusText);
+        statusText.setGravity(Gravity.CENTER);
+        rootLayout.addView(statusText);
 
-        setContentView(layout);
+        // 2. Set the content view (Critical! This renders the UI)
+        setContentView(rootLayout);
+    }
+
+    private void addSectionTitle(LinearLayout layout, String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextColor(Color.GRAY);
+        tv.setGravity(Gravity.CENTER);
+        tv.setPadding(0, 40, 0, 20); 
+        layout.addView(tv);
     }
 
     private EditText createLabeledInput(LinearLayout layout, String labelText, int defaultValue) {
@@ -92,11 +123,21 @@ public class MainActivity extends Activity {
         layout.addView(tv);
 
         EditText et = new EditText(this);
+        // TYPE_CLASS_NUMBER | 32 (TYPE_NUMBER_FLAG_DECIMAL)
         et.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | 32); 
         et.setText(defaultValue);
         et.setTextColor(Color.WHITE);
         layout.addView(et);
         return et;
+    }
+
+    private CheckBox createToggle(LinearLayout layout, String text, boolean defaultValue) {
+        CheckBox cb = new CheckBox(this);
+        cb.setText(text);
+        cb.setTextColor(Color.WHITE);
+        cb.setChecked(defaultValue);
+        layout.addView(cb);
+        return cb;
     }
 
     private void savePrefs() {
@@ -106,6 +147,8 @@ public class MainActivity extends Activity {
             editor.putInt("vol", Integer.parseInt(etVolume.getText().toString()));
             editor.putFloat("rate", Float.parseFloat(etRate.getText().toString()));
             editor.putInt("debounce", Integer.parseInt(etDebounce.getText().toString()));
+            editor.putBoolean("charging_only", cbChargingOnly.isChecked());
+            editor.putBoolean("prox_trigger", cbProxTrigger.isChecked());
         } catch (Exception e) {}
         editor.apply();
     }

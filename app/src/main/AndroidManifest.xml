@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.sensitime">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
     
+    <!-- Essential Permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.BATTERY_STATS" />
+    <!-- Required for Android 13+ to actually show the notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application 
         android:allowBackup="true" 
@@ -17,6 +20,8 @@
             </intent-filter>
         </activity>
         
+        <!-- Removed foregroundServiceType to ensure maximum compatibility 
+             across different OS versions since we are not targeting a specific Google Play category -->
         <service 
             android:name=".TimeService" 
             android:exported="false" />
