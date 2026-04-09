@@ -23,12 +23,13 @@ import java.util.Date;
 import java.text.SimpleDateFormat;
 
 public class TimeService extends Service implements TextToSpeech.OnInitListener, SensorEventListener {
+    private static final String CHANNEL_ID = "sensitime_channel";
+    
     private TextToSpeech tts;
     private SensorManager sensorManager;
     private Sensor proximitySensor;
     private AudioManager audioManager;
     private PowerManager powerManager;
-    private PowerManager.WakeLock wakeLock; // Corrected: Use PowerManager.WakeLock
     private boolean isTtsReady = false;
     private long lastTriggerTime = 0;
 
@@ -39,14 +40,11 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
         audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         powerManager = (PowerManager) getSystemService(POWER_SERVICE);
 
-        if (powerManager != null) {
-            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SensiTime::KeepAwake");
-        }
-
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
 
         if (proximitySensor != null) {
+            // Use UI delay to ensure responsiveness during sleep/charge states
             sensorManager.registerListener(this, proximitySensor, SensorManager.SENSOR_DELAY_UI);
         }
     }
@@ -58,28 +56,37 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
             return START_STICKY;
         }
 
-        startForegroundService();
-        return START_STICKY;
+        // CRITICAL: Start as Foreground Service to prevent being killed by Android OS
+        startForegroundServiceNow();
+        return START_STICKY;  // Always restart service if it crashes/stops unexpectedly
     }
 
-    private void startForegroundService() {
-        String channelId = "sensitime_channel";
+    private void startForegroundServiceNow() {
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
+        // Create notification channel for Android O+ 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(channelId, "SensiTime Background Service", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID, 
+                "SensiTime Background Service", 
+                NotificationManager.IMPORTANCE_LOW  // Low importance to avoid sound/vibration
+            );
             manager.createNotificationChannel(channel);
         }
 
-        Notification notification = new Notification.Builder(this, channelId)
+        // Build the notification (user cannot dismiss it while service is running)
+        Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("SensiTime")
                 .setContentText("Monitoring proximity and triggers...")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .build();
+                .setSmallIcon(android.R.drawable.ic_dialog_info)  // Standard icon to avoid crashes
+                .setOngoing(true);  // Prevent user from swiping away the notification
+
+        Notification notification = builder.build();
 
         try {
             startForeground(1, notification);
         } catch (Exception e) {
+            // Fallback for cases where foreground service fails on some OS versions
             e.printStackTrace();
         }
     }
@@ -108,31 +115,25 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
 
         // Condition: Screen MUST be off to avoid accidental noise during active use
         if (powerManager != null && !powerManager.isInteractive()) {
-            SharedPreferences prefs = getHPreferences(); // Note: I will fix this helper method below or just call directly
+            SharedPreferences prefs = getSharedPreferences("sensitime_prefs", MODE_PRIVATE);
             
-            // Corrected logic for Power Saving: Check Charging condition FIRST
+            // 1. Energy Optimization: Check "Charging Only" condition BEFORE any other logic
             boolean chargingOnly = prefs.getBoolean("charging_only", true);
-            if (chargingOnly && !isCharging()) {
-                return; // Exit immediately to avoid any WakeLock acquisition and save battery
+            if (chargingOnly) {
+                if (!isCharging()) {
+                    return; // Exit immediately if not charging, preventing CPU wake-up/TTS processing
+                }
             }
 
+            // 2. Proximity Trigger Logic
             if (prefs.getBoolean("prox_trigger", true)) {
                 float distance = event.values[0];
                 int threshold = prefs.getInt("dist", 5);
                 if (distance < threshold) {
-                    // Only acquire la l- la WakeLock if we have passed the charging check
-                    if (wakeLock != null && !wakeLock.isHeld()) {
-                        wakeLock.acquire(10 * 1000L); // Hold for max 10s to finish TTS playback
-                    }
                     executeSpeakSequence();
                 }
             }
         }
-    }
-
-    // Helper method used in onSensorChanged (fixing the call)
-    private SharedPreferences getHPreferences() {
-        return getSharedPreferences("sensitime_prefs", MODE_PRIVATE);
     }
 
     private void executeSpeakSequence() {
@@ -170,9 +171,6 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
 
     @Override
     public void onDestroy() {
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-        }
         if (sensorManager != null) sensorManager.unregisterListener(this);
         if (tts != null) {
             tts.stop();

@@ -14,7 +14,7 @@ import android.graphics.Color;
 
 public class MainActivity extends Activity {
     private EditText etDistance, etVolume, etRate, etDebounce;
-    private CheckBox cbChargingOnly, cbProxTrigger;
+    private CheckBox cbChargingOnly, cbProxTrigger, cbTouchTrigger, cbBtnTrigger;
     private Button btnStart, btnStop, btnTest;
     private TextView statusText;
 
@@ -22,7 +22,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. Create Root Layout (Dark Theme: Black background)
+        // 1. Build Root Layout (Dark Theme: Black background with white text)
         LinearLayout rootLayout = new LinearLayout(this);
         rootLayout.setOrientation(LinearLayout.VERTICAL);
         rootLayout.setGravity(Gravity.CENTER);
@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
         addSectionTitle(rootLayout, "Parameter Settings");
         etDistance = createLabeledInput(rootLayout, "Proximity Threshold (cm):", prefs.getInt("dist", 5));
         etVolume = createLabeledInput(rootLayout, "Voice Volume (0-15):", prefs.getInt("vol", 7));
-        // Speech rate supports decimals
+        // Speech rate supports decimal values for precision (e.g., 1.2)
         etRate = createDecimalInput(rootLayout, "Speech Rate (0.5 - 2.0):", String.valueOf(prefs.getFloat("rate", 1.0f)));
         etDebounce = createLabeledInput(rootLayout, "Debounce Interval (sec):", prefs.getInt("debounce", 5));
 

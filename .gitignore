@@ -1,0 +1,14 @@
+*.apk
+*.idsig
+*.jks
+tmt_build*
+.DS_Store
+build_apk.sh.tmp
+temp_*
+*~
+.class
+.dex
+.resources.arsc
+base.apk
+obj/
+apk/

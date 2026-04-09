@@ -6,7 +6,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.BATTERY_STATS" />
-    <!-- Required for Android 13+ to actually show the notification -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application 
@@ -20,10 +19,10 @@
             </intent-filter>
         </activity>
         
-        <!-- Removed foregroundServiceType to ensure maximum compatibility 
-             across different OS versions since we are not targeting a specific Google Play category -->
+        <!-- Foreground Service Type set to "specialUse" for maximum compatibility -->
         <service 
             android:name=".TimeService" 
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
     </application>
 </manifest>

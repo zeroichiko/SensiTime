@@ -5,7 +5,6 @@ A lightweight Android application that announces the current time via TTS when a
 ## Features
 - **Background Monitoring**: Runs as a foreground service to ensure reliability.
 - **Charging Only Mode**: Triggers only during charging to save battery and avoid accidental triggers.
-- **WakeLock Support**: Uses Partial Wake Lock to prevent CPU deep sleep issues on long screen-off periods.
 - **Customizable Settings**:
   - Proximity Threshold (cm)
   - Voice Volume (0-15)
@@ -23,5 +22,3 @@ Run the provided build script:
 ```bash
 ./build_apk.sh
 ```
-
-The APK will be generated as `sensitime_modified.apk` in the project root directory.
