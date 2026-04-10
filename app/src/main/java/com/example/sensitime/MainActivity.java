@@ -52,6 +52,12 @@ public class MainActivity extends Activity {
         btnStart.setTextColor(Color.WHITE);
         btnStart.setOnClickListener(v -> {
             savePrefs();
+            
+            // Request notification permission for Android 13+ (API 33+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1);
+            }
+            
             Intent intent = new Intent(this, TimeService.class);
             // Use startForegroundService for Android 8.0+ to prevent crashes
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {

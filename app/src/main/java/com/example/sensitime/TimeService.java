@@ -69,16 +69,16 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID, 
                 "SensiTime Background Service", 
-                NotificationManager.IMPORTANCE_LOW  // Low importance to avoid sound/vibration
+                NotificationManager.IMPORTANCE_DEFAULT  // Default importance to ensure visibility
             );
             manager.createNotificationChannel(channel);
         }
 
         // Build the notification (user cannot dismiss it while service is running)
         Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("SensiTime")
-                .setContentText("Monitoring proximity and triggers...")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)  // Standard icon to avoid crashes
+                .setContentTitle("SensiTime - Running")
+                .setContentText("Monitoring proximity sensor for time announcements")
+                .setSmallIcon(android.R.drawable.ic_lock_idle_low_battery)  // More visible icon
                 .setOngoing(true);  // Prevent user from swiping away the notification
 
         Notification notification = builder.build();
