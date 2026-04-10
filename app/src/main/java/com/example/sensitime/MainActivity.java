@@ -129,8 +129,8 @@ public class MainActivity extends Activity {
         layout.addView(tv);
 
         EditText et = new EditText(this);
-        // TYPE_CLASS_NUMBER | 32 (TYPE_NUMBER_FLAG_DECIMAL)
-        et.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | 32); 
+        // TYPE_NUMBER_FLAG_DECIMAL allows decimal input (e.g., 1.5)
+        et.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL); 
         et.setText(defaultValue);
         et.setTextColor(Color.WHITE);
         layout.addView(et);
