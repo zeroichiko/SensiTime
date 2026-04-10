@@ -16,7 +16,9 @@ import android.os.BatteryManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.content.pm.ServiceInfo;
 import android.speech.tts.TextToSpeech;
+import android.util.Log;
 
 import java.util.Locale;
 import java.util.Date;
@@ -24,6 +26,7 @@ import java.text.SimpleDateFormat;
 
 public class TimeService extends Service implements TextToSpeech.OnInitListener, SensorEventListener {
     private static final String CHANNEL_ID = "sensitime_channel";
+    private static final String TAG = "SensiTime.Service";
     
     private TextToSpeech tts;
     private SensorManager sensorManager;
@@ -51,6 +54,8 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "onStartCommand called. Action: " + (intent != null ? intent.getAction() : "null"));
+        
         if (intent != null && "ACTION_TEST_VOICE".equals(intent.getAction())) {
             speakTime(); 
             return START_STICKY;
@@ -58,6 +63,7 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
 
         // CRITICAL: Start as Foreground Service to prevent being killed by Android OS
         startForegroundServiceNow();
+        Log.d(TAG, "startForegroundServiceNow() completed");
         return START_STICKY;  // Always restart service if it crashes/stops unexpectedly
     }
 
@@ -72,6 +78,7 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
                 NotificationManager.IMPORTANCE_DEFAULT  // Default importance to ensure visibility
             );
             manager.createNotificationChannel(channel);
+            Log.d(TAG, "Notification channel created");
         }
 
         // Build the notification (user cannot dismiss it while service is running)
@@ -84,10 +91,20 @@ public class TimeService extends Service implements TextToSpeech.OnInitListener,
         Notification notification = builder.build();
 
         try {
-            startForeground(1, notification);
+            Log.d(TAG, "Attempting startForeground with specialUse type");
+            
+            // Android 15+ requires explicit foregroundServiceType parameter
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // API 34+: Use three-parameter version with FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                Log.d(TAG, "startForeground() called with specialUse type (API 34+)");
+            } else {
+                // Legacy: Two-parameter version for older Android versions
+                startForeground(1, notification);
+                Log.d(TAG, "startForeground() called (legacy API)");
+            }
         } catch (Exception e) {
-            // Fallback for cases where foreground service fails on some OS versions
-            e.printStackTrace();
+            Log.e(TAG, "startForeground failed: " + e.getMessage(), e);
         }
     }
 
